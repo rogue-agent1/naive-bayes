@@ -1,11 +1,1 @@
-# naive-bayes
-
-Naive Bayes text classifier.""".
-
-Zero dependencies. Python 3.8+.
-
-## Usage
-
-```bash
-python3 naive_bayes.py --help
-```
+# naive-bayes\n\nZero-dependency Python implementation.\n\n## Usage\n\n```bash\npython3 naive_bayes.py\n```\n

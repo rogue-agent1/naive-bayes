@@ -1,28 +1,43 @@
 #!/usr/bin/env python3
-"""naive_bayes - Naive Bayes text classifier."""
-import sys,math,re
-from collections import defaultdict,Counter
+"""Naive Bayes classifier — zero-dep implementation."""
+import sys, math
+from collections import defaultdict
+
 class NaiveBayes:
-    def __init__(s):s.classes={};s.vocab=set();s.priors={}
-    def train(s,docs):
-        class_docs=defaultdict(list)
-        for text,label in docs:class_docs[label].append(text)
-        total=len(docs)
-        for label,texts in class_docs.items():
-            s.priors[label]=len(texts)/total;words=[]
-            for t in texts:words.extend(re.findall(r"\w+",t.lower()))
-            s.classes[label]=Counter(words);s.vocab.update(words)
-    def predict(s,text):
-        words=re.findall(r"\w+",text.lower());best_label=None;best_score=float("-inf")
-        for label in s.classes:
-            score=math.log(s.priors[label]);total=sum(s.classes[label].values())
-            for w in words:score+=math.log((s.classes[label][w]+1)/(total+len(s.vocab)))
-            if score>best_score:best_score=score;best_label=label
-        return best_label,best_score
+    def __init__(self, smoothing=1.0):
+        self.smoothing=smoothing
+        self.class_counts=defaultdict(int)
+        self.feature_counts=defaultdict(lambda:defaultdict(lambda:defaultdict(int)))
+        self.vocab=defaultdict(set)
+        self.total=0
+
+    def fit(self, X, y):
+        for xi,yi in zip(X,y):
+            self.class_counts[yi]+=1; self.total+=1
+            for j,v in enumerate(xi):
+                self.feature_counts[yi][j][v]+=1
+                self.vocab[j].add(v)
+
+    def predict(self, X):
+        return [self._predict_one(x) for x in X]
+
+    def _predict_one(self, x):
+        best_c=None; best_p=float('-inf')
+        for c in self.class_counts:
+            lp=math.log(self.class_counts[c]/self.total)
+            for j,v in enumerate(x):
+                n=self.feature_counts[c][j][v]+self.smoothing
+                d=self.class_counts[c]+self.smoothing*len(self.vocab[j])
+                lp+=math.log(n/d)
+            if lp>best_p: best_p=lp; best_c=c
+        return best_c
+
 if __name__=="__main__":
-    train_data=[("great movie loved it","positive"),("terrible waste of time","negative"),
-        ("amazing performance brilliant","positive"),("awful boring bad","negative"),
-        ("fantastic wonderful excellent","positive"),("horrible worst ever","negative")]
-    nb=NaiveBayes();nb.train(train_data)
-    tests=["great performance","terrible movie","wonderful time","bad and boring"]
-    for t in tests:label,score=nb.predict(t);print(f"  '{t}' → {label} ({score:.2f})")
+    X=[["sunny","hot"],["sunny","hot"],["overcast","hot"],["rain","mild"],["rain","cool"],
+       ["rain","cool"],["overcast","cool"],["sunny","mild"],["sunny","cool"],["rain","mild"]]
+    y=["no","no","yes","yes","yes","no","yes","no","yes","yes"]
+    nb=NaiveBayes(); nb.fit(X,y)
+    tests=[["sunny","cool"],["overcast","hot"],["rain","mild"]]
+    for t in tests: print(f"{t} -> {nb._predict_one(t)}")
+    preds=nb.predict(X); acc=sum(p==a for p,a in zip(preds,y))/len(y)
+    print(f"Training accuracy: {acc:.0%}")
