@@ -1,74 +1,63 @@
 #!/usr/bin/env python3
-"""naive_bayes - Gaussian and Multinomial Naive Bayes classifiers."""
-import sys, math
-from collections import Counter, defaultdict
+"""Naive Bayes text classifier."""
+import sys, math, re
+from collections import defaultdict
 
-class GaussianNB:
-    def __init__(self):
-        self.classes = []
-        self.means = {}
-        self.vars = {}
-        self.priors = {}
-
-    def fit(self, X, y):
-        self.classes = list(set(y))
-        n = len(y)
-        for c in self.classes:
-            Xc = [X[i] for i in range(n) if y[i] == c]
-            nc = len(Xc)
-            self.priors[c] = nc / n
-            ndim = len(Xc[0])
-            self.means[c] = [sum(x[j] for x in Xc) / nc for j in range(ndim)]
-            self.vars[c] = [sum((x[j] - self.means[c][j])**2 for x in Xc) / nc + 1e-9 for j in range(ndim)]
-
-    def _log_prob(self, x, c):
-        lp = math.log(self.priors[c])
-        for j in range(len(x)):
-            lp += -0.5 * math.log(2 * math.pi * self.vars[c][j])
-            lp += -0.5 * (x[j] - self.means[c][j])**2 / self.vars[c][j]
-        return lp
-
-    def predict(self, x):
-        return max(self.classes, key=lambda c: self._log_prob(x, c))
-
-class MultinomialNB:
+class NaiveBayes:
     def __init__(self, alpha=1.0):
         self.alpha = alpha
-        self.class_log_prior = {}
-        self.feature_log_prob = {}
-        self.classes = []
-
-    def fit(self, X, y):
-        self.classes = list(set(y))
-        n = len(y)
-        ndim = len(X[0])
-        for c in self.classes:
-            Xc = [X[i] for i in range(n) if y[i] == c]
-            self.class_log_prior[c] = math.log(len(Xc) / n)
-            totals = [sum(x[j] for x in Xc) + self.alpha for j in range(ndim)]
-            total_sum = sum(totals)
-            self.feature_log_prob[c] = [math.log(t / total_sum) for t in totals]
-
-    def predict(self, x):
-        def score(c):
-            return self.class_log_prior[c] + sum(x[j] * self.feature_log_prob[c][j] for j in range(len(x)))
-        return max(self.classes, key=score)
+        self.class_counts = defaultdict(int)
+        self.word_counts = defaultdict(lambda: defaultdict(int))
+        self.vocab = set()
+    def tokenize(self, text):
+        return re.findall(r"[a-z]+", text.lower())
+    def train(self, texts, labels):
+        for text, label in zip(texts, labels):
+            self.class_counts[label] += 1
+            for word in self.tokenize(text):
+                self.word_counts[label][word] += 1
+                self.vocab.add(word)
+    def predict(self, text):
+        tokens = self.tokenize(text)
+        total = sum(self.class_counts.values())
+        best_class, best_score = None, float('-inf')
+        for cls in self.class_counts:
+            score = math.log(self.class_counts[cls] / total)
+            total_words = sum(self.word_counts[cls].values())
+            for word in tokens:
+                count = self.word_counts[cls].get(word, 0)
+                score += math.log((count + self.alpha) / (total_words + self.alpha * len(self.vocab)))
+            if score > best_score:
+                best_score, best_class = score, cls
+        return best_class
+    def predict_proba(self, text):
+        tokens = self.tokenize(text)
+        total = sum(self.class_counts.values())
+        scores = {}
+        for cls in self.class_counts:
+            score = math.log(self.class_counts[cls] / total)
+            tw = sum(self.word_counts[cls].values())
+            for word in tokens:
+                count = self.word_counts[cls].get(word, 0)
+                score += math.log((count + self.alpha) / (tw + self.alpha * len(self.vocab)))
+            scores[cls] = score
+        max_s = max(scores.values())
+        exp_scores = {c: math.exp(s - max_s) for c, s in scores.items()}
+        total_exp = sum(exp_scores.values())
+        return {c: v / total_exp for c, v in exp_scores.items()}
 
 def test():
-    X = [[1,1],[2,2],[3,3],[8,8],[9,9],[10,10]]
-    y = [0,0,0,1,1,1]
-    gnb = GaussianNB()
-    gnb.fit(X, y)
-    assert gnb.predict([2, 2]) == 0
-    assert gnb.predict([9, 9]) == 1
-    assert abs(gnb.priors[0] - 0.5) < 0.01
-    X2 = [[3,0,1],[2,1,0],[0,1,3],[1,0,2]]
-    y2 = ["pos","pos","neg","neg"]
-    mnb = MultinomialNB()
-    mnb.fit(X2, y2)
-    assert mnb.predict([3,0,0]) == "pos"
-    assert mnb.predict([0,0,3]) == "neg"
-    print("All tests passed!")
+    nb = NaiveBayes()
+    texts = ["great movie loved it", "terrible awful waste", "fantastic brilliant amazing",
+             "horrible boring bad", "wonderful excellent perfect", "worst disaster ugly"]
+    labels = ["pos", "neg", "pos", "neg", "pos", "neg"]
+    nb.train(texts, labels)
+    assert nb.predict("great brilliant film") == "pos"
+    assert nb.predict("terrible horrible movie") == "neg"
+    proba = nb.predict_proba("great film")
+    assert proba["pos"] > proba["neg"]
+    print("  naive_bayes: ALL TESTS PASSED")
 
 if __name__ == "__main__":
-    test() if "--test" in sys.argv else print("naive_bayes: Naive Bayes classifiers. Use --test")
+    if len(sys.argv) > 1 and sys.argv[1] == "test": test()
+    else: print("Naive Bayes classifier")

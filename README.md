@@ -1,6 +1,10 @@
-# naive_bayes
-Single-file Python CLI tool. Zero dependencies, Python 3.8+.
+# naive-bayes
+
+Single-file Python CLI. Zero dependencies.
+
 ## Usage
+
 ```bash
-python3 naive_bayes.py --test
+python3 naive_bayes.py
+python3 naive_bayes.py test
 ```
