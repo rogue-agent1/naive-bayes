@@ -1,55 +1,74 @@
 #!/usr/bin/env python3
-"""naive_bayes: Gaussian Naive Bayes classifier."""
-import math, sys
-from collections import defaultdict
+"""naive_bayes - Gaussian and Multinomial Naive Bayes classifiers."""
+import sys, math
+from collections import Counter, defaultdict
 
 class GaussianNB:
     def __init__(self):
-        self.classes = {}
+        self.classes = []
+        self.means = {}
+        self.vars = {}
         self.priors = {}
 
     def fit(self, X, y):
-        by_class = defaultdict(list)
-        for xi, yi in zip(X, y):
-            by_class[yi].append(xi)
-        total = len(y)
-        for c, samples in by_class.items():
-            self.priors[c] = len(samples) / total
-            n_features = len(samples[0])
-            stats = []
-            for f in range(n_features):
-                vals = [s[f] for s in samples]
-                mean = sum(vals) / len(vals)
-                var = sum((v - mean)**2 for v in vals) / len(vals) + 1e-9
-                stats.append((mean, var))
-            self.classes[c] = stats
+        self.classes = list(set(y))
+        n = len(y)
+        for c in self.classes:
+            Xc = [X[i] for i in range(n) if y[i] == c]
+            nc = len(Xc)
+            self.priors[c] = nc / n
+            ndim = len(Xc[0])
+            self.means[c] = [sum(x[j] for x in Xc) / nc for j in range(ndim)]
+            self.vars[c] = [sum((x[j] - self.means[c][j])**2 for x in Xc) / nc + 1e-9 for j in range(ndim)]
 
     def _log_prob(self, x, c):
-        log_p = math.log(self.priors[c])
-        for xi, (mean, var) in zip(x, self.classes[c]):
-            log_p += -0.5 * math.log(2 * math.pi * var) - (xi - mean)**2 / (2 * var)
-        return log_p
+        lp = math.log(self.priors[c])
+        for j in range(len(x)):
+            lp += -0.5 * math.log(2 * math.pi * self.vars[c][j])
+            lp += -0.5 * (x[j] - self.means[c][j])**2 / self.vars[c][j]
+        return lp
 
     def predict(self, x):
-        return max(self.classes.keys(), key=lambda c: self._log_prob(x, c))
+        return max(self.classes, key=lambda c: self._log_prob(x, c))
 
-    def predict_batch(self, X):
-        return [self.predict(x) for x in X]
+class MultinomialNB:
+    def __init__(self, alpha=1.0):
+        self.alpha = alpha
+        self.class_log_prior = {}
+        self.feature_log_prob = {}
+        self.classes = []
+
+    def fit(self, X, y):
+        self.classes = list(set(y))
+        n = len(y)
+        ndim = len(X[0])
+        for c in self.classes:
+            Xc = [X[i] for i in range(n) if y[i] == c]
+            self.class_log_prior[c] = math.log(len(Xc) / n)
+            totals = [sum(x[j] for x in Xc) + self.alpha for j in range(ndim)]
+            total_sum = sum(totals)
+            self.feature_log_prob[c] = [math.log(t / total_sum) for t in totals]
+
+    def predict(self, x):
+        def score(c):
+            return self.class_log_prior[c] + sum(x[j] * self.feature_log_prob[c][j] for j in range(len(x)))
+        return max(self.classes, key=score)
 
 def test():
-    X = [[1,1],[1,2],[2,1],[2,2],[5,5],[5,6],[6,5],[6,6]]
-    y = [0,0,0,0,1,1,1,1]
-    nb = GaussianNB()
-    nb.fit(X, y)
-    assert nb.predict([1.5, 1.5]) == 0
-    assert nb.predict([5.5, 5.5]) == 1
-    preds = nb.predict_batch([[0,0],[10,10]])
-    assert preds == [0, 1]
-    # Priors
-    assert abs(nb.priors[0] - 0.5) < 0.01
-    assert abs(nb.priors[1] - 0.5) < 0.01
+    X = [[1,1],[2,2],[3,3],[8,8],[9,9],[10,10]]
+    y = [0,0,0,1,1,1]
+    gnb = GaussianNB()
+    gnb.fit(X, y)
+    assert gnb.predict([2, 2]) == 0
+    assert gnb.predict([9, 9]) == 1
+    assert abs(gnb.priors[0] - 0.5) < 0.01
+    X2 = [[3,0,1],[2,1,0],[0,1,3],[1,0,2]]
+    y2 = ["pos","pos","neg","neg"]
+    mnb = MultinomialNB()
+    mnb.fit(X2, y2)
+    assert mnb.predict([3,0,0]) == "pos"
+    assert mnb.predict([0,0,3]) == "neg"
     print("All tests passed!")
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "test": test()
-    else: print("Usage: naive_bayes.py test")
+    test() if "--test" in sys.argv else print("naive_bayes: Naive Bayes classifiers. Use --test")
