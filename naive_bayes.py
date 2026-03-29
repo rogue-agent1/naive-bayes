@@ -1,43 +1,38 @@
 #!/usr/bin/env python3
-"""Naive Bayes classifier — zero-dep implementation."""
-import sys, math
-from collections import defaultdict
-
+"""naive_bayes - Text classifier."""
+import sys,argparse,json,math,re
+from collections import Counter,defaultdict
 class NaiveBayes:
-    def __init__(self, smoothing=1.0):
-        self.smoothing=smoothing
-        self.class_counts=defaultdict(int)
-        self.feature_counts=defaultdict(lambda:defaultdict(lambda:defaultdict(int)))
-        self.vocab=defaultdict(set)
-        self.total=0
-
-    def fit(self, X, y):
-        for xi,yi in zip(X,y):
-            self.class_counts[yi]+=1; self.total+=1
-            for j,v in enumerate(xi):
-                self.feature_counts[yi][j][v]+=1
-                self.vocab[j].add(v)
-
-    def predict(self, X):
-        return [self._predict_one(x) for x in X]
-
-    def _predict_one(self, x):
-        best_c=None; best_p=float('-inf')
-        for c in self.class_counts:
-            lp=math.log(self.class_counts[c]/self.total)
-            for j,v in enumerate(x):
-                n=self.feature_counts[c][j][v]+self.smoothing
-                d=self.class_counts[c]+self.smoothing*len(self.vocab[j])
-                lp+=math.log(n/d)
-            if lp>best_p: best_p=lp; best_c=c
-        return best_c
-
-if __name__=="__main__":
-    X=[["sunny","hot"],["sunny","hot"],["overcast","hot"],["rain","mild"],["rain","cool"],
-       ["rain","cool"],["overcast","cool"],["sunny","mild"],["sunny","cool"],["rain","mild"]]
-    y=["no","no","yes","yes","yes","no","yes","no","yes","yes"]
-    nb=NaiveBayes(); nb.fit(X,y)
-    tests=[["sunny","cool"],["overcast","hot"],["rain","mild"]]
-    for t in tests: print(f"{t} -> {nb._predict_one(t)}")
-    preds=nb.predict(X); acc=sum(p==a for p,a in zip(preds,y))/len(y)
-    print(f"Training accuracy: {acc:.0%}")
+    def __init__(self):self.class_counts=Counter();self.word_counts=defaultdict(Counter);self.vocab=set()
+    def train(self,texts,labels):
+        for text,label in zip(texts,labels):
+            self.class_counts[label]+=1
+            words=re.findall(r"\w+",text.lower())
+            for w in words:self.word_counts[label][w]+=1;self.vocab.add(w)
+    def predict(self,text):
+        words=re.findall(r"\w+",text.lower())
+        total=sum(self.class_counts.values());scores={}
+        for label in self.class_counts:
+            score=math.log(self.class_counts[label]/total)
+            total_words=sum(self.word_counts[label].values())
+            for w in words:
+                score+=math.log((self.word_counts[label][w]+1)/(total_words+len(self.vocab)))
+            scores[label]=round(score,4)
+        best=max(scores,key=scores.get)
+        return best,scores
+def main():
+    p=argparse.ArgumentParser(description="Naive Bayes")
+    p.add_argument("--demo",action="store_true")
+    p.add_argument("--predict",help="Text to classify")
+    args=p.parse_args()
+    nb=NaiveBayes()
+    texts=["great movie loved it","terrible film waste of time","amazing performance brilliant","awful boring disaster","excellent wonderful masterpiece","horrible ugly terrible mess","fun exciting thrilling","dull tedious painful"]
+    labels=["pos","neg","pos","neg","pos","neg","pos","neg"]
+    nb.train(texts,labels)
+    if args.predict:
+        pred,scores=nb.predict(args.predict)
+        print(json.dumps({"text":args.predict,"prediction":pred,"scores":scores}))
+    else:
+        correct=sum(1 for t,l in zip(texts,labels) if nb.predict(t)[0]==l)
+        print(json.dumps({"training_accuracy":round(correct/len(texts),4),"vocab_size":len(nb.vocab),"classes":dict(nb.class_counts)},indent=2))
+if __name__=="__main__":main()
