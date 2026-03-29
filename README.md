@@ -1,6 +1,8 @@
-# naive-bayes
+# naive_bayes
 
-Naive Bayes text classifier. Single-file Python CLI, zero dependencies.
+naive_bayes - Gaussian and multinomial Naive Bayes classifier.
+
+Zero-dependency, single-file Python CLI.
 
 ## Usage
 
