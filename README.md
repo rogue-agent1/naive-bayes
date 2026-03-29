@@ -1,6 +1,6 @@
-# naive-bayes
+# Naive Bayes Classifier
 
-Naive Bayes text classifier
+Naive Bayes Classifier — zero-dependency, single-file Python CLI.
 
 ## Usage
 
@@ -8,7 +8,6 @@ Naive Bayes text classifier
 python3 naive_bayes.py --help
 ```
 
-## Features
+## License
 
-- Zero dependencies (Python 3.8+)
-- Single file implementation
+MIT
