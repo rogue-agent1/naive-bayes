@@ -1,10 +1,3 @@
-# naive-bayes
-
-Single-file Python CLI. Zero dependencies.
-
-## Usage
-
-```bash
-python3 naive_bayes.py
-python3 naive_bayes.py test
-```
+# naive_bayes
+Naive Bayes — Gaussian and Multinomial classifiers.
+Single-file Python, zero dependencies.
