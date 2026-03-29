@@ -1,11 +1,11 @@
 # naive_bayes
 
-naive_bayes - Gaussian and multinomial Naive Bayes classifier.
+naive_bayes: Gaussian Naive Bayes classifier.
 
-Zero-dependency, single-file Python CLI.
+Single-file, zero-dependency Python CLI.
 
 ## Usage
 
 ```bash
-python3 naive_bayes.py
+python3 naive_bayes.py test
 ```
